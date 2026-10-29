@@ -47,6 +47,14 @@ enum Ajustes {
         UserDefaults.standard.string(forKey: Chave.servidorProprio) ?? ""
     }
 
+    /// o endereço do servidor próprio como URL (nil se vazio ou sem http:// / https:// e host)
+    static var urlServidorProprio: URL? {
+        let t = servidorProprio.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let u = URL(string: t), let esquema = u.scheme?.lowercased(), esquema == "http" || esquema == "https",
+              let h = u.host, !h.isEmpty else { return nil }
+        return u
+    }
+
     /// o endereço que a ponte do servidor local usa para /lan e /players (nil: sem multiplayer)
     static var enderecoMultiplayer: String? {
         switch multiplayer {

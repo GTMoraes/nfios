@@ -119,6 +119,10 @@ Qualquer um destes caminhos até o app Arquivos do iPhone:
 - **App Dispositivos Apple do Windows** › iPhone › Arquivos › NFSU2: a pasta vai direto para dentro do app.
 
 No app: **Importar pasta…** e escolha a pasta do jogo (com o `pacote-nfsu2` dentro, as duas coisas vêm de uma vez).
+
+Ou, com o seu servidor no GT-SRV no ar (`servidor-gt-srv/`): **Baixar do meu servidor**, pelo Tailscale, com o
+endereço em Ajustes › Meu servidor. Baixa o jogo e o pacote conferindo o SHA-256 de cada arquivo; caiu no meio,
+tocar de novo continua de onde parou.
 Da pasta do jogo só vem o que o jogo lê (SPEED2.EXE, server.dll, server.cfg e as pastas de dados): saves, mods e
 desinstaladores do PC ficam de fora. Fica tudo em Arquivos › No Meu iPhone › NFSU2 (Jogo, Pacote, Downloads),
 fora do backup do iCloud.
@@ -197,6 +201,9 @@ oferece compartilhar.
 
 ## Histórico
 
+- **0.3.0**: TestFlight (o workflow envia cada build, com a assinatura gerenciada pela Apple); só iPhone; **Baixar do
+  meu servidor** (jogo e pacote do GT-SRV pelo Tailscale, conferidos por SHA-256, retomando de onde parou); o
+  endereço do servidor próprio vira um ajuste próprio, usado pelo multiplayer e pelo download.
 - **0.2.0**: 120 Hz; multiplayer no modo offline pela ponte (nfsu2.xyz ou servidor próprio); kit do servidor
   próprio para o GT-SRV; sem servidor de multiplayer, a página agora entra no modo sem servidor dela (antes o 404
   fazia a página achar que havia servidor).

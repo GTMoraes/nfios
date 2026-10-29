@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// A tela inicial: os dois modos (online pelo nfsu2.xyz e offline com a sua cópia), a importação e o diagnóstico.
@@ -42,8 +43,21 @@ struct InicioView: View {
         }
         // a importação terminou (bem ou mal): o estado das pastas mudou
         .onChange(of: importador.ativo) {
+            // a tela não apaga durante uma cópia ou download longo (com a tela apagada o iOS suspende o app)
+            UIApplication.shared.isIdleTimerDisabled = importador.ativo
             if !importador.ativo { atualizar() }
         }
+    }
+
+    /// o jogo e o pacote do servidor próprio (Ajustes › Meu servidor), pelo Tailscale
+    private func baixarDoServidor() {
+        importador.erro = nil
+        importador.resultado = nil
+        guard let base = Ajustes.urlServidorProprio else {
+            importador.erro = Importador.Falha.semServidor.errorDescription
+            return
+        }
+        importador.baixar(de: base)
     }
 
     /// lê o estado das pastas fora da thread principal (medir 2,5 GB de arquivos leva alguns milissegundos)
@@ -118,6 +132,14 @@ struct InicioView: View {
                     }
                     .buttonStyle(.glass)
                 }
+                Button {
+                    baixarDoServidor()
+                } label: {
+                    Label("Baixar do meu servidor", systemImage: "arrow.down.circle")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.glass)
             }
             if let erro = importador.erro {
                 Label(erro, systemImage: "exclamationmark.triangle.fill")

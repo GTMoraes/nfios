@@ -47,16 +47,6 @@ struct AjustesView: View {
                         Text("Meu servidor").tag("proprio")
                         Text("Nenhum").tag("nenhum")
                     }
-                    if multiplayer == "proprio" {
-                        TextField("http://100.91.24.1:9091", text: $servidorProprio)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .submitLabel(.done)
-                        if let erroEndereco {
-                            Text(erroEndereco).font(.footnote).foregroundStyle(.red)
-                        }
-                    }
                     if multiplayer != "nenhum" {
                         Button {
                             testar()
@@ -75,7 +65,22 @@ struct AjustesView: View {
                 } header: {
                     Text("Multiplayer do modo offline")
                 } footer: {
-                    Text("O jogo continua vindo do iPhone (com 120 Hz e tudo); só o multiplayer (free roam, salas, contagem de jogadores) passa pelo servidor escolhido. Use um servidor da mesma versão do pacote: o nfsu2.xyz atualiza sozinho, e um pacote antigo pode deixar de conversar com ele. Meu servidor: o endereço com http://, o IP do Tailscale e a porta (não o nome *.ts.net). Vale na próxima conexão da página.")
+                    Text("O jogo continua vindo do iPhone (com 120 Hz e tudo); só o multiplayer (free roam, salas, contagem de jogadores) passa pelo servidor escolhido. Use um servidor da mesma versão do pacote: o nfsu2.xyz atualiza sozinho, e um pacote antigo pode deixar de conversar com ele. Vale na próxima conexão da página.")
+                }
+
+                Section {
+                    TextField("http://100.91.24.1:9091", text: $servidorProprio)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                    if let erroEndereco {
+                        Text(erroEndereco).font(.footnote).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Meu servidor")
+                } footer: {
+                    Text("O seu servidor no GT-SRV (servidor-gt-srv/ no projeto): o endereço com http://, o IP do Tailscale e a porta (não o nome *.ts.net). Serve para o multiplayer (\"Meu servidor\" acima) e para o \"Baixar do meu servidor\" da tela inicial.")
                 }
 
                 Section {
@@ -143,7 +148,12 @@ struct AjustesView: View {
     private func aplicar() {
         teste = nil
         let e = ServidorLocal.aplicarMultiplayer()
-        erroEndereco = (multiplayer == "proprio" && !servidorProprio.isEmpty) ? e : nil
+        if multiplayer == "proprio" {
+            erroEndereco = servidorProprio.isEmpty ? nil : e
+        } else {
+            let u = servidorProprio.trimmingCharacters(in: .whitespacesAndNewlines)
+            erroEndereco = u.isEmpty || Ajustes.urlServidorProprio != nil ? nil : "Endereço inválido: use http://IP:porta"
+        }
     }
 
     private func testar() {

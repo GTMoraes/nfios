@@ -4,9 +4,11 @@
 # multiplayer: /lan (o WebSocket da LAN virtual, free roam, salas) e /players.  O app do iPhone continua rodando o
 # jogo do próprio aparelho; a ponte do servidor local do app liga só o multiplayer a este servidor.
 #
-# Três containers no mesmo espaço de rede (o "net" segura o espaço, para cada um reiniciar sozinho):
+# Quatro containers no mesmo espaço de rede (o "net" segura o espaço, para cada um reiniciar sozinho):
 #   server   o nfsu2-web, que só escuta em 127.0.0.1:8080 desse espaço (é assim que a imagem funciona)
-#   caddy    recebe em :9091 e repassa ao 127.0.0.1:8080 (HTTP simples; o Tailscale já cifra o caminho)
+#   arquivos os arquivos do jogo e do pacote para o app baixar (127.0.0.1:8081)
+#   caddy    recebe em :9091: /arquivos/ vai para o arquivos, o resto para o server (HTTP simples; o Tailscale já
+#            cifra o caminho)
 #   net      publica a porta no Windows
 # Sem Cloudflare Tunnel e sem hostname: o iPhone chega por http://100.91.24.1:<porta>.  A porta fica em 0.0.0.0 porque
 # quem consome está fora da máquina; a regra do firewall do Windows (LEIA-ME) só aceita a LAN e o Tailscale, e o
@@ -77,6 +79,29 @@ services:
     ulimits: { nofile: 65536 }
     logging: { driver: local }
 
+  # os arquivos do jogo e do pacote, para o botão "Baixar do meu servidor" do app (http://<ip>:9091/arquivos/...):
+  # um servidor de arquivos estáticos, só leitura, sem listar pastas (o app baixa a lista do manifesto.json).
+  # Separado do caddy da frente: se a pasta não estiver montada, só os downloads param, o multiplayer segue.
+  arquivos:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    network_mode: service:net
+    depends_on: [net]
+    command: ["caddy", "file-server", "--root", "/srv", "--listen", "127.0.0.1:8081"]
+    volumes:
+      - type: bind
+        source: ${NFSU2_ARQUIVOS:-./arquivos}
+        target: /srv
+        read_only: true
+        bind: { create_host_path: false }
+    read_only: true
+    tmpfs: [/data, /config]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    logging: { driver: local }
+
 configs:
   caddyfile:
     content: |
@@ -85,8 +110,13 @@ configs:
       	auto_https off
       }
       :9091 {
-      	reverse_proxy 127.0.0.1:8080
       	header -Server
+      	handle_path /arquivos/* {
+      		reverse_proxy 127.0.0.1:8081
+      	}
+      	handle {
+      		reverse_proxy 127.0.0.1:8080
+      	}
       }
 
 volumes:
