@@ -23,8 +23,13 @@ cargo rustc --release --lib --crate-type staticlib --target aarch64-apple-ios --
 
 A=target/aarch64-apple-ios/release/libnfsu2srv.a
 [ -f "$A" ] || { echo "::error::faltou $A"; exit 1; }
+# a lista de símbolos vai para um arquivo antes do grep: com "nm | grep -q" e o pipefail, o grep sai no primeiro
+# acerto, o nm leva SIGPIPE no meio da lista (grande, com o rustls) e o pipeline inteiro conta como falha
+SIMBOLOS="$(mktemp)"
+nm -gU "$A" > "$SIMBOLOS" 2>/dev/null || true
 for s in _nfsu2srv_start _nfsu2srv_stop _nfsu2srv_alive _nfsu2srv_port _nfsu2srv_last_error _nfsu2srv_set_remote; do
-  nm -gU "$A" 2>/dev/null | grep -q " T $s\$" || { echo "::error::a biblioteca não exporta $s"; exit 1; }
+  grep -q " T $s\$" "$SIMBOLOS" || { echo "::error::a biblioteca não exporta $s"; exit 1; }
 done
+rm -f "$SIMBOLOS"
 lipo -info "$A"
 echo "servidor OK: $A ($(du -h "$A" | cut -f1))"
