@@ -31,6 +31,8 @@ targets:
         LSApplicationCategoryType: public.app-category.racing-games
         # Modo Jogo do iOS: menos atividade em segundo plano e menos latência no Bluetooth (controles, AirPods)
         GCSupportsGameMode: true
+        # só criptografia padrão (o TLS do https): o TestFlight não pergunta de exportação a cada build
+        ITSAppUsesNonExemptEncryption: false
         # libera os 120 Hz da tela ProMotion para o app (sem isto o iPhone limita todo app a 60); o WKWebView ainda
         # precisa do ajuste "120 Hz" (JogoViewController.liberar120Hz)
         CADisableMinimumFrameDurationOnPhone: true
