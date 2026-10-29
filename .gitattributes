@@ -1,0 +1,3 @@
+# LF sempre (os scripts rodam no bash do WSL e do macOS do GitHub Actions)
+* text=auto eol=lf
+*.png binary

@@ -1,0 +1,94 @@
+# NFSU2 — o servidor de multiplayer próprio, no GT-SRV, só pelo Tailscale (e pela LAN de casa).
+#
+# O servidor oficial do nfsu2-web (imagem ghcr.io/th0mk/nfsu2-web-rs, da MESMA versão do pacote do app) atende o
+# multiplayer: /lan (o WebSocket da LAN virtual, free roam, salas) e /players.  O app do iPhone continua rodando o
+# jogo do próprio aparelho; a ponte do servidor local do app liga só o multiplayer a este servidor.
+#
+# Três containers no mesmo espaço de rede (o "net" segura o espaço, para cada um reiniciar sozinho):
+#   server   o nfsu2-web, que só escuta em 127.0.0.1:8080 desse espaço (é assim que a imagem funciona)
+#   caddy    recebe em :9091 e repassa ao 127.0.0.1:8080 (HTTP simples; o Tailscale já cifra o caminho)
+#   net      publica a porta no Windows
+# Sem Cloudflare Tunnel e sem hostname: o iPhone chega por http://100.91.24.1:<porta>.  A porta fica em 0.0.0.0 porque
+# quem consome está fora da máquina; a regra do firewall do Windows (LEIA-ME) só aceita a LAN e o Tailscale, e o
+# roteador não encaminha porta nenhuma para cá.
+#
+# Configuração no .env ao lado (modelo: env.exemplo).  Subir:  docker compose up -d
+name: nfsu2
+services:
+  net:
+    image: registry.k8s.io/pause:3.10
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${NFSU2_PORTA:-9091}:9091"
+    logging: { driver: local }
+
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    network_mode: service:net
+    depends_on: [net]
+    configs: [{ source: caddyfile, target: /etc/caddy/Caddyfile }]
+    read_only: true
+    tmpfs: [/data, /config]
+    cap_drop: [ALL]
+    # o binário da imagem do Caddy tem essa capacidade marcada no arquivo: sem ela no container ele nem executa
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    logging: { driver: local }
+
+  server:
+    # a versão é a do pacote do app (pacote/montar-pacote.sh, REV_PADRAO): página, módulo e servidor do mesmo commit
+    image: ${NFSU2_IMAGEM:-ghcr.io/th0mk/nfsu2-web-rs:sha-82742d0}
+    restart: unless-stopped
+    network_mode: service:net
+    depends_on: [net]
+    command: ["--behind-proxy"]
+    environment:
+      # os nomes pelos quais o servidor atende (o Host do pedido): o IP do GT-SRV no Tailscale e na LAN
+      NFSU2_HOST: ${NFSU2_HOST:-100.91.24.1,10.0.0.129}
+      NFSU2_HTTP_PORT: "8080"
+      NFSU2_REAL_IP_HEADER: x-forwarded-for
+      # jogadores ao mesmo tempo (a imagem vem com 6000, para servidor público)
+      NFSU2_MAX_PEERS: ${NFSU2_MAX_PEERS:-32}
+      # saves por frase-chave no servidor: desligado (os saves ficam no iPhone)
+      NFSU2_VAULT_GB: "0"
+      NFSU2_THREADS: "2"
+    volumes:
+      # create_host_path: false — se a pasta não estiver lá quando o Docker subir, o container não sobe (em vez de
+      # montar uma pasta vazia em silêncio; mapa de infra, seção 9).  O servidor também se recusa a subir sem o
+      # SPEED2.EXE.
+      - type: bind
+        source: ${NFSU2_JOGO:-./jogo}
+        target: /game
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ./module
+        target: /module
+        read_only: true
+        bind: { create_host_path: false }
+      - state:/state
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    memswap_limit: 1g
+    ulimits: { nofile: 65536 }
+    logging: { driver: local }
+
+configs:
+  caddyfile:
+    content: |
+      {
+      	admin off
+      	auto_https off
+      }
+      :9091 {
+      	reverse_proxy 127.0.0.1:8080
+      	header -Server
+      }
+
+volumes:
+  # as chaves do servidor (ETag, tokens da LAN) e os registros: ficam entre atualizações
+  state:

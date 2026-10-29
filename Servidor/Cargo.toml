@@ -1,0 +1,30 @@
+[package]
+name = "nfsu2srv"
+version = "0.1.0"
+edition = "2021"
+description = "Servidor HTTP local do app NFSU2 para iPhone: serve a pagina, o modulo e a pasta do jogo em 127.0.0.1"
+license = "MIT"
+publish = false
+
+[lib]
+# staticlib: o que o app do iPhone linka (libnfsu2srv.a); rlib: os testes e o exemplo
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+# a ponte de multiplayer até um servidor https (nfsu2.xyz): TLS em Rust puro + ring (compila para iOS sem nada do
+# sistema), com as raízes de certificado embutidas
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+# certificados de teste para o servidor TLS falso dos testes da ponte
+rcgen = "0.14"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# unwind (o padrao): um panic numa conexao derruba so a thread dela, nunca o app
+debug = false
+strip = "debuginfo"

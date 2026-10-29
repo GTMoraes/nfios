@@ -1,0 +1,97 @@
+name: Gerar IPA
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # para publicar o IPA em Releases
+
+jobs:
+  ipa:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Escolher o Xcode mais novo
+        run: |
+          ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Cache do Rust (servidor local)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            Servidor/target
+          key: servidor-${{ hashFiles('Servidor/Cargo.toml', 'Servidor/src/**') }}
+
+      - name: Compilar o servidor local para iPhone (Rust)
+        run: bash scripts/compilar-servidor.sh
+
+      - name: Gerar o projeto (XcodeGen)
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Compilar
+        run: |
+          set -o pipefail
+          xcodebuild -project NFSU2.xcodeproj -scheme NFSU2 \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee xcodebuild.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
+
+      - name: Empacotar o IPA (assinatura provisória)
+        run: |
+          APP=build/Build/Products/Release-iphoneos/NFSU2.app
+          ls "$APP"
+          codesign --force --sign - "$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry NFSU2.ipa Payload
+          ls -la NFSU2.ipa
+
+      - name: Publicar o IPA em Releases (link direto)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: NFSU2 — build ${{ github.run_number }}
+          body: |
+            Commit ${{ github.sha }}
+            Link fixo para a versão mais nova:
+            https://github.com/${{ github.repository }}/releases/latest/download/NFSU2.ipa
+          files: NFSU2.ipa
+          make_latest: true
+
+      - name: Link do IPA
+        run: |
+          echo "### NFSU2.ipa" >> $GITHUB_STEP_SUMMARY
+          echo "Desta build: https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/NFSU2.ipa" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Sempre a mais nova: https://github.com/${{ github.repository }}/releases/latest/download/NFSU2.ipa" >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NFSU2-ipa
+          path: NFSU2.ipa
+
+      - name: Resumo dos erros (se falhar)
+        if: failure()
+        run: grep -n "error:" xcodebuild.log | head -80 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore

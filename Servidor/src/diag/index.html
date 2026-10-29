@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Diagnóstico — NFSU2</title>
+<style>
+  :root { --bg: #0d0d0d; --fg: #e6e6e6; --dim: #8a8a8a; --ok: #c8f088; --bad: #ff7a6b; --warn: #ffd166; --line: #262626; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+  main { padding: calc(env(safe-area-inset-top) + 16px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px); max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.sub { color: var(--dim); margin: 0 0 16px; }
+  #verdict { font-weight: 600; padding: 12px 14px; border-radius: 12px; background: #161616; border: 1px solid var(--line); margin-bottom: 16px; }
+  #verdict.ok { border-color: #3c5a22; color: var(--ok); }
+  #verdict.bad { border-color: #5a2a22; color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.s { width: 28px; font-size: 16px; }
+  td.n { width: 42%; }
+  td.d { color: var(--dim); word-break: break-word; font-size: 13px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+  button { font: inherit; color: #0d0d0d; background: var(--ok); border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+  button.sec { background: #2a2a2a; color: var(--fg); }
+  button:disabled { opacity: .5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Diagnóstico</h1>
+  <p class="sub">O que este iPhone oferece ao jogo dentro do app (WebKit do sistema, servidor local).</p>
+  <div id="verdict">Verificando…</div>
+  <table><tbody id="out"></tbody></table>
+  <div class="row">
+    <button id="module" class="sec" disabled>Compilar o módulo do jogo</button>
+    <button id="share">Compartilhar relatório</button>
+  </div>
+</main>
+<script type="module" src="/__diag/diag.js"></script>
+</body>
+</html>

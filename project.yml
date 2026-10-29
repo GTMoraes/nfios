@@ -1,0 +1,70 @@
+name: NFSU2
+options:
+  bundleIdPrefix: com.gtm
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGN_IDENTITY: ""
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+targets:
+  NFSU2:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: NFSU2
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        LSApplicationCategoryType: public.app-category.racing-games
+        # Modo Jogo do iOS: menos atividade em segundo plano e menos latência no Bluetooth (controles, AirPods)
+        GCSupportsGameMode: true
+        # libera os 120 Hz da tela ProMotion para o app (sem isto o iPhone limita todo app a 60); o WKWebView ainda
+        # precisa do ajuste "120 Hz" (JogoViewController.liberar120Hz)
+        CADisableMinimumFrameDurationOnPhone: true
+        # o multiplayer com um servidor próprio no endereço da rede de casa (10.0.0.x) pede a permissão de Rede Local
+        NSLocalNetworkUsageDescription: Para o multiplayer com o seu próprio servidor na rede de casa.
+        UILaunchScreen:
+          UIColorName: Fundo
+        UIApplicationSupportsIndirectInputEvents: true
+        UIStatusBarHidden: false
+        UIViewControllerBasedStatusBarAppearance: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIUserInterfaceStyle: Dark
+        # Documentos (Jogo, Pacote, Downloads) aparece no app Arquivos e no Dispositivos Apple do Windows
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        # o servidor local é http://127.0.0.1 (e um servidor próprio na rede pode ser http)
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        # domínios "do app" no WKWebView: o service worker do nfsu2.xyz (o modo offline do site) só funciona num
+        # domínio daqui; 127.0.0.1 já conta como do app.  frx9.com: para um servidor nfsu2 próprio, se um dia houver
+        WKAppBoundDomains:
+          - nfsu2.xyz
+          - frx9.com
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gtm.nfsu2
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # o servidor local (Servidor/, Rust): scripts/compilar-servidor.sh gera a libnfsu2srv.a
+        SWIFT_OBJC_BRIDGING_HEADER: App/Ponte.h
+        HEADER_SEARCH_PATHS: "$(PROJECT_DIR)/Servidor/include"
+        LIBRARY_SEARCH_PATHS: "$(PROJECT_DIR)/Servidor/target/aarch64-apple-ios/release"
+        OTHER_LDFLAGS: "-lnfsu2srv"
+    scheme: {}

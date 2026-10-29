@@ -1,0 +1,12 @@
+# gerados no build (GitHub Actions)
+NFSU2.xcodeproj/
+build/
+Payload/
+*.ipa
+xcodebuild.log
+Servidor/target/
+# o jogo e tudo o que é feito dele nunca vão para o repositório (é da EA)
+pacote-nfsu2/
+SPEED2.EXE
+*.wasm
+.DS_Store
