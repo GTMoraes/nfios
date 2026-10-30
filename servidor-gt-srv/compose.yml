@@ -30,8 +30,7 @@ services:
     network_mode: service:net
     depends_on: [net]
     configs: [{ source: caddyfile, target: /etc/caddy/Caddyfile }]
-    read_only: true
-    tmpfs: [/data, /config]
+    # (sem read_only: o Compose grava o Caddyfile dentro do container ao criar, e recusa num container só leitura)
     cap_drop: [ALL]
     # o binário da imagem do Caddy tem essa capacidade marcada no arquivo: sem ela no container ele nem executa
     cap_add: [NET_BIND_SERVICE]

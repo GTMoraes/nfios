@@ -150,4 +150,13 @@ echo "Pronto em $DEST (arquivos para o app em $ARQ):"
 ( cd "$DEST" && sha256sum compose.yml module/nfsu2.wasm jogo/SPEED2.EXE )
 sha256sum "$ARQ/manifesto.json"
 echo
-echo "Próximo: cd $DEST && docker compose up -d && docker compose ps"
+
+# As pastas module/, jogo/ e a dos arquivos foram trocadas por pastas novas: um container que já estava rodando continua
+# preso às antigas (apagadas) e passa a ver pastas vazias (o teste de saúde do server dá 404 no /game.json).  Se a
+# stack está no ar, recria os containers para montarem as novas.
+if command -v docker >/dev/null && [ -n "$(cd "$DEST" && docker compose ps -q 2>/dev/null)" ]; then
+  echo "A stack está no ar: recriando os containers para montarem as pastas novas…"
+  ( cd "$DEST" && docker compose up -d --force-recreate && sleep 20 && docker compose ps )
+else
+  echo "Próximo: cd $DEST && docker compose up -d && docker compose ps"
+fi

@@ -84,6 +84,9 @@ arquivos + nfsu2-web-rs; arquivos em D:\nfsu2\arquivos), só Tailscale/LAN, fire
 ## Depois
 
 - **Logs:** `cd ~/nfsu2 && docker compose logs -f server` (as linhas `[lan]` mostram quem entra e sai).
+- **Rodar o `preparar.sh` de novo** (pasta do jogo mudou, pacote novo): ele troca as pastas inteiras e, se a stack
+  estiver no ar, recria os containers sozinho no fim (um container rodando ficaria preso às pastas antigas, vazias, e o
+  `server` ficaria `unhealthy` com 404 no `/game.json`).
 - **Atualizar** (quando o pacote do app for remontado com outro commit): rode o `preparar.sh` de novo com a pasta do
   jogo e o pacote novo, ponha `NFSU2_IMAGEM=ghcr.io/th0mk/nfsu2-web-rs:sha-<7 letras do commit>` no `~/nfsu2/.env` (o `preparar.sh`
   avisa) e `docker compose up -d`. O módulo do servidor e o do app têm que ser do mesmo build.
