@@ -199,6 +199,22 @@ final class Importador: @unchecked Sendable {   // o que a tela lê muda só na 
             let v = try? obra.appendingPathComponent(i.p).resourceValues(forKeys: [.fileSizeKey])
             return v?.fileSize.map(Int64.init) == i.s
         }
+        // o que já está no iPhone igual ao do servidor (mesmo tamanho e SHA-256) não se baixa de novo: vai para a obra
+        // como cópia por clone do APFS (instantânea, sem gastar espaço).  Numa atualização do pacote, só ele desce.
+        DispatchQueue.main.async { self.titulo = "Conferindo o que já está no iPhone…" }
+        for i in m.arquivos where !pronto(i) {
+            if cancelado { throw Falha.cancelado }
+            let partes = i.p.split(separator: "/", maxSplits: 1).map(String.init)
+            guard partes.count == 2 else { continue }
+            let base = partes[0] == "Jogo" ? Pastas.jogo : Pastas.pacote
+            let atual = base.appendingPathComponent(partes[1])
+            let tam = (try? atual.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
+            guard tam == i.s, Pastas.sha256(atual)?.lowercased() == i.h.lowercased() else { continue }
+            let destino = obra.appendingPathComponent(i.p)
+            try? fm.createDirectory(at: destino.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.removeItem(at: destino)
+            try? fm.copyItem(at: atual, to: destino)
+        }
         let soma = m.arquivos.reduce(Int64(0)) { $0 + $1.s }
         let falta = m.arquivos.filter { !pronto($0) }.reduce(Int64(0)) { $0 + $1.s }
         let livre = (try? Pastas.documentos.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?

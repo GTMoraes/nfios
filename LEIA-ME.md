@@ -148,7 +148,7 @@ Valem na próxima vez que o jogo abrir.
   pelo Tailscale; o kit para o GT-SRV está em `servidor-gt-srv/`) ou *Nenhum*. **Testar a conexão** pergunta o
   número de jogadores pelo mesmo caminho que a página usa. Vale na próxima conexão da página.
   Versões: o pacote é de um commit fixo do nfsu2-web e o nfsu2.xyz atualiza quando o autor publica. Hoje são o
-  mesmo (`82742d0`); se o nfsu2.xyz andar e o multiplayer parar de funcionar com ele, remonte o pacote com
+  o mesmo (`b735d26`, de 03/11/2026); se o nfsu2.xyz andar e o multiplayer parar de funcionar com ele, remonte o pacote com
   `--rev main`, ou use o seu servidor, que fica na versão do pacote.
 
 ## Downloads da página
@@ -201,6 +201,9 @@ oferece compartilhar.
 
 ## Histórico
 
+- **0.4.0**: nfsu2-web atualizado para `b735d26` (03/11/2026: tela dividida, mapa detalhado, modo foto, drift entre
+  jogadores, correções de travamento no free roam e nas garagens…); **Baixar do meu servidor** reaproveita os arquivos
+  que já estão no iPhone (numa atualização do pacote, só ele desce).
 - **0.3.0**: TestFlight (o workflow envia cada build, com a assinatura gerenciada pela Apple); só iPhone; **Baixar do
   meu servidor** (jogo e pacote do GT-SRV pelo Tailscale, conferidos por SHA-256, retomando de onde parou); o
   endereço do servidor próprio vira um ajuste próprio, usado pelo multiplayer e pelo download.

@@ -15,7 +15,7 @@
 set -euo pipefail
 
 EXE_SHA=f9dd86c054878ce6276beb07c1fd61874f7a1e4bf1f241b084c65b73e24168a7
-REV_IMAGEM=82742d0
+REV_IMAGEM=b735d26
 
 erro() { echo "ERRO: $*" >&2; exit 1; }
 AQUI="$(cd "$(dirname "$0")" && pwd)"
