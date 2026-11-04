@@ -1,8 +1,9 @@
-//! HTTP/1.1 minimo: le pedidos (sem corpo) de uma conexao com keep-alive e escreve respostas.
+//! HTTP/1.1 minimo: le pedidos de uma conexao com keep-alive e escreve respostas.
 //!
-//! So o que a pagina do jogo e o WebKit usam: GET e HEAD, cabecalhos, Range.  Um pedido com corpo recebe 413 e a
-//! conexao fecha (nada aqui recebe corpo).  Pedidos em sequencia na mesma conexao (keep-alive, inclusive os que
-//! chegam juntos no mesmo pacote) sao atendidos um por vez, na ordem.
+//! So o que a pagina do jogo e o WebKit usam: GET e HEAD, cabecalhos, Range.  Corpo (Content-Length) so nas rotas
+//! repassadas ao servidor de multiplayer (ponte.rs: /vault, /names, /friends), lido por `read_body`; nas outras, um
+//! pedido com corpo recebe 413 e a conexao fecha.  Pedidos em sequencia na mesma conexao (keep-alive, inclusive os
+//! que chegam juntos no mesmo pacote) sao atendidos um por vez, na ordem.
 
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
@@ -118,6 +119,30 @@ impl Conn {
             }
             self.end += n;
         }
+    }
+
+    /// O corpo do pedido atual: exatamente `n` bytes (o Content-Length), primeiro o que ja veio junto com o cabecalho.
+    /// Erro se a conexao cair antes.
+    pub fn read_body(&mut self, n: usize) -> io::Result<Vec<u8>> {
+        let mut out = Vec::with_capacity(n);
+        let ja = (self.end - self.start).min(n);
+        out.extend_from_slice(&self.buf[self.start..self.start + ja]);
+        self.start += ja;
+        if self.start == self.end {
+            self.start = 0;
+            self.end = 0;
+        }
+        let mut tmp = [0u8; 16 << 10];
+        while out.len() < n {
+            let quer = (n - out.len()).min(tmp.len());
+            match self.stream.read(&mut tmp[..quer]) {
+                Ok(0) => return Err(io::ErrorKind::UnexpectedEof.into()),
+                Ok(k) => out.extend_from_slice(&tmp[..k]),
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(out)
     }
 
     /// Escreve a linha de status e os cabecalhos.  `len`: Content-Length (None: sem corpo e sem Content-Length).
@@ -245,6 +270,7 @@ fn hex(c: u8) -> Option<u8> {
 pub fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        201 => "Created",
         204 => "No Content",
         206 => "Partial Content",
         304 => "Not Modified",
@@ -252,13 +278,20 @@ pub fn reason(status: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        401 => "Unauthorized",
         409 => "Conflict",
+        411 => "Length Required",
+        412 => "Precondition Failed",
         413 => "Content Too Large",
         416 => "Range Not Satisfiable",
         421 => "Misdirected Request",
+        428 => "Precondition Required",
+        429 => "Too Many Requests",
         431 => "Request Header Fields Too Large",
         500 => "Internal Server Error",
+        502 => "Bad Gateway",
         503 => "Service Unavailable",
+        507 => "Insufficient Storage",
         _ => "Status",
     }
 }

@@ -65,7 +65,7 @@ struct AjustesView: View {
                 } header: {
                     Text("Multiplayer do modo offline")
                 } footer: {
-                    Text("O jogo continua vindo do iPhone (com 120 Hz e tudo); só o multiplayer (free roam, salas, contagem de jogadores) passa pelo servidor escolhido. Use um servidor da mesma versão do pacote: o nfsu2.xyz atualiza sozinho, e um pacote antigo pode deixar de conversar com ele. Vale na próxima conexão da página.")
+                    Text("O jogo continua vindo do iPhone (com 120 Hz e tudo); o multiplayer (free roam, salas, contagem de jogadores), os jogos salvos na nuvem, o nome reservado e os amigos passam pelo servidor escolhido. Com a sua frase secreta em Jogos salvos na nuvem (na página), o modo offline joga com o seu nome e sincroniza os saves com o modo online; sem internet, joga com os saves do iPhone e sincroniza quando a internet voltar. Use um servidor da mesma versão do pacote: o nfsu2.xyz atualiza sozinho, e um pacote antigo pode deixar de conversar com ele. Vale na próxima conexão da página.")
                 }
 
                 Section {

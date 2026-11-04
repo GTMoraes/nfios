@@ -6,9 +6,14 @@
 //!             devolve o 101 e daí em diante só copia bytes nos dois sentidos: os quadros da página já vêm mascarados
 //!             (como um cliente tem que mandar) e os do servidor sem máscara (como a página espera receber).
 //!   /players  GET e HEAD repassados ao remoto (a contagem de jogadores, as crews).
+//!   /vault, /names, /friends, /seen
+//!             repassados com método, query, corpo e alguns cabeçalhos (`repassar`): os jogos salvos na nuvem, os
+//!             nomes reservados, os amigos e a contagem de quem jogou.  Com eles o modo offline usa a frase secreta do
+//!             jogador como o online: o nome reservado vale no free roam (o hub isola quem joga com um nome reservado
+//!             sem a frase dele), e os saves sincronizam pela nuvem com o modo online e outros aparelhos.
 //!
-//! A conexão ao remoto não manda Origin: o servidor oficial aceita clientes sem Origin ("tools send no Origin",
-//! web/server-rs/src/app/mod.rs own_page) e recusa Origin de outro site, que é o que um navegador mandaria.
+//! A conexão ao remoto não manda Origin nem Sec-Fetch-Site: o servidor oficial aceita clientes sem Origin ("tools send
+//! no Origin", web/server-rs/src/app/mod.rs own_page) e recusa Origin de outro site, que é o que um navegador mandaria.
 //! TLS com rustls + ring e as raízes da Mozilla (webpki-roots): não depende de nada do sistema.
 
 use std::io::{self, Read, Write};
@@ -235,6 +240,114 @@ fn des_chunk(mut b: &[u8]) -> Vec<u8> {
     out
 }
 
+// ------------------------------------------------------------------------------------------- pedidos HTTP --
+
+/// os cabeçalhos do pedido da página que seguem para o remoto (o resto fica: Origin e Sec-Fetch-* fariam o servidor
+/// oficial recusar, "a página de outro site"; Cookie e o Host da página não são dele)
+const CAB_IDA: &[&str] = &["authorization", "content-type", "if-match", "if-none-match", "accept"];
+/// os cabeçalhos da resposta do remoto que voltam para a página (o cofre usa ETag e x-vault-*; 429 e 503 trazem
+/// Retry-After; 405, Allow)
+const CAB_VOLTA: &[&str] = &["content-type", "etag", "x-vault-saved", "x-vault-earlier", "retry-after", "allow", "www-authenticate"];
+/// o maior corpo de resposta aceito do remoto (o cofre manda até 256 KB)
+const MAX_RESPOSTA: usize = 4 << 20;
+
+/// a resposta do remoto: status, os cabeçalhos de CAB_VOLTA que vieram (nomes em minúsculas) e o corpo
+struct Resposta {
+    status: u16,
+    cab: Vec<(String, String)>,
+    corpo: Vec<u8>,
+}
+
+/// Um pedido HTTP ao remoto (uma conexão só para ele, Connection: close), com os cabeçalhos de CAB_IDA da página e o
+/// corpo (Content-Length) quando há.
+fn pedir(r: &Remoto, metodo: &str, alvo: &str, q: &Request, corpo: &[u8]) -> io::Result<Resposta> {
+    let mut l = conectar(r)?;
+    let mut pedido = format!(
+        "{metodo} {alvo} HTTP/1.1\r\nHost: {}\r\nUser-Agent: nfsu2-ios\r\nAccept-Encoding: identity\r\nConnection: close\r\n",
+        r.host_header()
+    );
+    for k in CAB_IDA {
+        if let Some(v) = q.header(k) {
+            if !v.contains(['\r', '\n']) {
+                pedido.push_str(&format!("{k}: {v}\r\n"));
+            }
+        }
+    }
+    if q.header("accept").is_none() {
+        pedido.push_str("Accept: application/json\r\n");
+    }
+    if !corpo.is_empty() || matches!(metodo, "POST" | "PUT") {
+        pedido.push_str(&format!("Content-Length: {}\r\n", corpo.len()));
+    }
+    pedido.push_str("\r\n");
+    let mut tudo = pedido.into_bytes();
+    tudo.extend_from_slice(corpo);
+    l.write_all(&tudo)?;
+    l.flush()?;
+    let (status, h, mut resto) = ler_cabecalho(&mut l)?;
+    // sem corpo: HEAD, 1xx, 204 e 304
+    let sem_corpo = metodo == "HEAD" || status < 200 || status == 204 || status == 304;
+    if sem_corpo {
+        resto.clear();
+    } else {
+        let limite: usize = cab(&h, "content-length").and_then(|v| v.parse().ok()).unwrap_or(usize::MAX);
+        let chunked = cab(&h, "transfer-encoding").is_some_and(|v| v.to_ascii_lowercase().contains("chunked"));
+        let mut tmp = [0u8; 16 << 10];
+        while resto.len() < limite && !(chunked && fim_do_chunked(&resto)) {
+            if resto.len() > MAX_RESPOSTA {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "resposta grande demais do servidor"));
+            }
+            let n = l.read(&mut tmp)?;
+            if n == 0 {
+                break;
+            }
+            resto.extend_from_slice(&tmp[..n]);
+        }
+        if chunked {
+            resto = des_chunk(&resto);
+        }
+        resto.truncate(limite.min(resto.len()));
+    }
+    let volta = h.into_iter().filter(|(k, _)| CAB_VOLTA.contains(&k.as_str())).collect();
+    Ok(Resposta { status, cab: volta, corpo: resto })
+}
+
+/// o corpo chunked já tem o pedaço final ("0\r\n\r\n")
+fn fim_do_chunked(b: &[u8]) -> bool {
+    b.ends_with(b"0\r\n\r\n") && (b.len() == 5 || b[..b.len() - 5].ends_with(b"\r\n"))
+}
+
+fn devolver(c: &mut Conn, q: &Request, res: Resposta, tipo_padrao: &str, keep: bool) -> io::Result<bool> {
+    let mut h: Vec<(&str, String)> = Vec::new();
+    let mut tem_tipo = false;
+    for (k, v) in &res.cab {
+        let nome = match k.as_str() {
+            "content-type" => {
+                tem_tipo = true;
+                "Content-Type"
+            }
+            "etag" => "ETag",
+            "x-vault-saved" => "x-vault-saved",
+            "x-vault-earlier" => "x-vault-earlier",
+            "retry-after" => "Retry-After",
+            "allow" => "Allow",
+            "www-authenticate" => "WWW-Authenticate",
+            _ => continue,
+        };
+        h.push((nome, v.clone()));
+    }
+    if !tem_tipo && !res.corpo.is_empty() {
+        h.push(("Content-Type", tipo_padrao.to_string()));
+    }
+    // 304: sem corpo e sem Content-Length (o do remoto não veio)
+    let len = if res.status == 304 { None } else { Some(res.corpo.len() as u64) };
+    c.write_head(res.status, &h, len, keep)?;
+    if q.method != "HEAD" && res.status != 304 {
+        c.write_body(&res.corpo)?;
+    }
+    Ok(keep)
+}
+
 // --------------------------------------------------------------------------------------------------- /players --
 
 /// GET/HEAD /players?... repassado ao remoto, com o status, o tipo e o corpo dele
@@ -243,45 +356,63 @@ pub fn players(q: &Request, c: &mut Conn, keep: bool) -> io::Result<bool> {
     // /lan); um 404 ela leria como servidor no ar (web/src/app/players.ts, serverAnswers: status < 500)
     let Some(r) = atual() else { return simples(c, q, 503, "nenhum servidor de multiplayer escolhido", keep) };
     let alvo = format!("{}/players{}", r.base, if q.query.is_empty() { String::new() } else { format!("?{}", q.query) });
-    let res = (|| -> io::Result<(u16, Option<String>, Vec<u8>)> {
-        let mut l = conectar(&r)?;
-        let pedido = format!(
-            "{} {alvo} HTTP/1.1\r\nHost: {}\r\nUser-Agent: nfsu2-ios\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n",
-            q.method,
-            r.host_header()
-        );
-        l.write_all(pedido.as_bytes())?;
-        l.flush()?;
-        let (status, h, mut corpo) = ler_cabecalho(&mut l)?;
-        if q.method != "HEAD" {
-            let limite: usize = cab(&h, "content-length").and_then(|v| v.parse().ok()).unwrap_or(usize::MAX);
-            let mut tmp = [0u8; 8192];
-            while corpo.len() < limite && corpo.len() < 1 << 20 {
-                let n = l.read(&mut tmp)?;
-                if n == 0 {
-                    break;
-                }
-                corpo.extend_from_slice(&tmp[..n]);
-            }
-            if cab(&h, "transfer-encoding").is_some_and(|v| v.to_ascii_lowercase().contains("chunked")) {
-                corpo = des_chunk(&corpo);
-            }
-            corpo.truncate(limite.min(corpo.len()));
-        } else {
-            corpo.clear();
-        }
-        Ok((status, cab(&h, "content-type").map(str::to_string), corpo))
-    })();
-    match res {
-        Ok((status, tipo, corpo)) => {
-            let h = [("Content-Type", tipo.unwrap_or_else(|| "application/json".into()))];
-            c.write_head(status, &h, Some(corpo.len() as u64), keep)?;
-            if q.method != "HEAD" {
-                c.write_body(&corpo)?;
-            }
-            Ok(keep)
-        }
-        // sem resposta do servidor: 502 (a página trata como "servidor não respondeu")
+    match pedir(&r, &q.method, &alvo, q, &[]) {
+        Ok(res) => devolver(c, q, res, "application/json", keep),
+        // sem resposta do servidor (sem internet, fora do ar): 502 (a página trata como "servidor não respondeu")
+        Err(e) => simples(c, q, 502, &format!("servidor de multiplayer: {e}"), keep),
+    }
+}
+
+// ------------------------------------------------------------------------- /vault, /names, /friends, /seen --
+
+/// Os métodos que cada rota repassada aceita (os do servidor oficial), e o maior corpo.  None: não é rota da ponte.
+///   /vault    os jogos salvos na nuvem (cifrados na página; o servidor só guarda): GET, HEAD, PUT (até 256 KB lá),
+///             DELETE
+///   /names    os nomes reservados: GET (o que um nome é para a frase secreta), POST (reservar)
+///   /friends  os amigos do free roam: GET (lista e recados), POST (aceitar, recusar, mensagem...)
+///   /seen     a página conta que jogou hoje (e as configurações): GET
+pub fn rota(path: &str) -> Option<(&'static [&'static str], usize)> {
+    match path {
+        "/vault" => Some((&["GET", "HEAD", "PUT", "DELETE"], 512 << 10)),
+        "/names" => Some((&["GET", "HEAD", "POST"], 16 << 10)),
+        "/friends" => Some((&["GET", "HEAD", "POST"], 16 << 10)),
+        "/seen" => Some((&["GET", "HEAD"], 0)),
+        _ => None,
+    }
+}
+
+/// Repassa ao remoto um pedido de `rota` (método, query, os cabeçalhos de CAB_IDA e o corpo), e devolve à página o
+/// status, os cabeçalhos de CAB_VOLTA e o corpo dele.
+/// - Nenhum servidor escolhido: 404, que para a página é "servidor sem nuvem, sem nomes e sem amigos" (o modo offline
+///   de antes).
+/// - Sem resposta (sem internet, fora do ar): 502.  A página trata como falha passageira: o jogo segue com os saves
+///   do iPhone e sincroniza quando o servidor voltar a responder.
+pub fn repassar(q: &Request, c: &mut Conn, keep: bool) -> io::Result<bool> {
+    let Some((metodos, max)) = rota(&q.path) else { return simples(c, q, 404, "Not found", keep) };
+    let tamanho = q.header("content-length").map(|v| v.trim().parse::<usize>());
+    if q.header("transfer-encoding").is_some() {
+        return simples(c, q, 411, "Length required", false);
+    }
+    let n = match tamanho {
+        None => 0,
+        Some(Ok(n)) => n,
+        Some(Err(_)) => return simples(c, q, 400, "Bad request", false),
+    };
+    if !metodos.contains(&q.method.as_str()) {
+        let h = [("Allow", metodos.join(", "))];
+        c.write_head(405, &h, Some(0), false)?;
+        return Ok(false);
+    }
+    let leva_corpo = matches!(q.method.as_str(), "POST" | "PUT");
+    if n > max || (n > 0 && !leva_corpo) {
+        // (o corpo fica sem ler: a conexão fecha)
+        return simples(c, q, 413, "Too large", false);
+    }
+    let corpo = if n > 0 { c.read_body(n)? } else { Vec::new() };
+    let Some(r) = atual() else { return simples(c, q, 404, "Not found", keep) };
+    let alvo = format!("{}{}{}", r.base, q.path, if q.query.is_empty() { String::new() } else { format!("?{}", q.query) });
+    match pedir(&r, &q.method, &alvo, q, &corpo) {
+        Ok(res) => devolver(c, q, res, "application/json", keep),
         Err(e) => simples(c, q, 502, &format!("servidor de multiplayer: {e}"), keep),
     }
 }

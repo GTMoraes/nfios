@@ -9,6 +9,8 @@
 //!   /data-blocks/v2/<c>   blocos de 1 MiB de um arquivo do jogo (?b=primeiro&n=quantos, até 8), sem compressão
 //!   /players, /lan        a ponte de multiplayer (ponte.rs): repassados ao servidor escolhido nos Ajustes; 503 sem
 //!                         nenhum (a página entra no modo offline dela)
+//!   /vault, /names,       também repassados (ponte.rs repassar), com métodos e corpos: jogos salvos na nuvem, nomes
+//!   /friends, /seen       reservados, amigos; 404 sem servidor escolhido, 502 sem resposta (sem internet)
 //!   /sw.js                404: no modo local não há service worker (o servidor está sempre aqui)
 //!   /__diag/              a página de diagnóstico do app (WebGPU, isolamento, OPFS, ...), embutida
 //!   /__status             JSON com o estado do servidor (para o app)
@@ -193,6 +195,16 @@ pub fn serve(cfg: &Config, q: &Request, c: &mut Conn) -> io::Result<bool> {
     if q.path.is_empty() {
         return plain(c, q, 400, "Bad request", false);
     }
+    // os jogos salvos na nuvem, os nomes reservados e os amigos: repassados ao servidor escolhido nos Ajustes, com
+    // os seus métodos e corpos (ponte.rs); só a nossa página
+    if crate::ponte::rota(&q.path).is_some() {
+        let outra_origem = q.header("origin").is_some_and(|o| !own_origin(o, cfg.port));
+        let outro_site = q.header("sec-fetch-site").is_some_and(|f| f != "same-origin");
+        if outra_origem || outro_site {
+            return plain(c, q, 403, "Forbidden", false);
+        }
+        return crate::ponte::repassar(q, c, keep);
+    }
     if q.method != "GET" && q.method != "HEAD" {
         let h = [("Allow", "GET, HEAD".to_string())];
         c.write_head(405, &h, Some(0), false)?;
@@ -226,7 +238,7 @@ pub fn serve(cfg: &Config, q: &Request, c: &mut Conn) -> io::Result<bool> {
             }
             return crate::ponte::lan(q, c, &cfg.retired);
         }
-        "/sw.js" | "/vault" | "/names" | "/robots.txt" => return plain(c, q, 404, "Not found", keep),
+        "/sw.js" | "/robots.txt" => return plain(c, q, 404, "Not found", keep),
         _ => {}
     }
     if let Some(rest) = p.strip_prefix("/data/") {

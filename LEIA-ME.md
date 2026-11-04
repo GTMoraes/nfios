@@ -15,7 +15,7 @@ Dois modos:
 | Outros jogadores | sim: free roam, Online, crews | sim, pela ponte: com o nfsu2.xyz (padrão) ou o seu servidor (Ajustes) |
 | Sem internet | depois de abrir uma vez e usar o **Preload the game data** (fim da página do site) | sempre |
 | Depende do site | sim (se o site sair do ar, sobra a cópia que o modo offline do site guardou) | não |
-| Saves | os do site (e na nuvem por frase-senha) | no iPhone, separados dos do modo online |
+| Saves | os do site (e na nuvem por frase secreta) | no iPhone; com a mesma frase secreta, sincronizados com o online pela nuvem (0.5.0) |
 
 ## Como funciona
 
@@ -27,15 +27,24 @@ Dois modos:
 - **O servidor local** (`Servidor/`, Rust, só biblioteca padrão + `libc`) é a parte do servidor oficial que a página
   usa para jogar sozinho: a página, `/game.json`, `/game.wasm`, `/data-manifest`, `/data/` (com Range) e
   `/data-blocks/v2/` (blocos de 1 MiB), com os cabeçalhos de isolamento (COOP/COEP/CORP) que liberam o
-  `SharedArrayBuffer` das threads do jogo. Escuta só em `127.0.0.1`. `/vault`, `/names` e `/sw.js` respondem 404
-  (sem nuvem de saves, sem nomes reservados e sem o modo offline do site, que não faz falta: o servidor está sempre
-  no aparelho). A porta é fixa porque a origem (`http://127.0.0.1:48021`) é onde a página guarda os saves.
+  `SharedArrayBuffer` das threads do jogo. Escuta só em `127.0.0.1`. `/sw.js` responde 404 (sem o modo offline do
+  site, que não faz falta: o servidor está sempre no aparelho). A porta é fixa porque a origem (`http://127.0.0.1:48021`) é onde a página guarda os saves.
 - **A ponte de multiplayer** (`Servidor/src/ponte.rs`): `/lan` (o WebSocket da LAN virtual: free roam, salas, Online)
   e `/players` vão para o servidor escolhido nos Ajustes, o nfsu2.xyz ou o seu. A ponte abre a conexão com o
   servidor (TLS em Rust, `rustls`, quando é `https`), repete o aperto de mão da página e daí em diante só copia os
   bytes nos dois sentidos. Sem servidor escolhido (ou fora do ar), `/players` responde 503 e a página entra no modo
   sem servidor dela ("Not connected to the server"), e o jogo sozinho segue normal. É o híbrido: o jogo roda do
   iPhone, com 120 Hz, e só o multiplayer sai pela rede.
+- **Nuvem, nome reservado e amigos** (0.5.0, `ponte.rs repassar`): `/vault` (jogos salvos na nuvem), `/names` (nomes
+  reservados), `/friends` e `/seen` também vão ao servidor escolhido, com método, corpo e só os cabeçalhos que o
+  oficial usa (`Authorization`, `If-Match`, `If-None-Match`, `Content-Type`; de volta, `ETag` e `x-vault-*`). Nunca
+  `Origin`, `Sec-Fetch-Site` nem cookie: com eles o oficial recusaria ("página de outro site"). Por quê: desde 28/10 o
+  hub do free roam isola sem aviso quem joga com um nome reservado sem a frase secreta dele (nenhum carro, ninguém te
+  vê). Com o repasse, a página do modo offline faz o mesmo que a online: confere o nome, aceita a frase secreta em
+  **Jogos salvos na nuvem** e a manda ao hub. Os saves sincronizam pela nuvem: quem jogou envia quando o jogo salva e
+  ao fechar; o outro modo baixa a versão nova ao abrir e antes do Jogar, se os saves dele não mudaram; mudou dos dois
+  lados, a página mostra os dois e pergunta. Sem servidor escolhido: 404 (como antes, sem nuvem). Sem internet: 502,
+  o jogo segue com os saves do iPhone e a página sincroniza sozinha quando o servidor volta a responder.
 - **120 Hz**: o WebKit segura a página perto de 60 quadros por segundo (preferência
   `PreferPageRenderingUpdatesNear60FPSEnabled`, a mesma de Safari › Avançado › Recursos do WebKit). O app a desliga
   no `WKWebView` dele (pela interface interna do WebKit; se um iOS futuro a tirar, o jogo só volta a 60) e declara
@@ -146,7 +155,11 @@ Valem na próxima vez que o jogo abrir.
 
 - **Multiplayer do modo offline**: *nfsu2.xyz* (padrão), *Meu servidor* (o endereço, ex. `http://100.91.24.1:9091`
   pelo Tailscale; o kit para o GT-SRV está em `servidor-gt-srv/`) ou *Nenhum*. **Testar a conexão** pergunta o
-  número de jogadores pelo mesmo caminho que a página usa. Vale na próxima conexão da página.
+  número de jogadores pelo mesmo caminho que a página usa. Vale na próxima conexão da página. A nuvem, o nome
+  reservado e os amigos vão para o mesmo servidor (com *Nenhum*, o modo offline fica sem eles).
+  **Primeira vez com a frase secreta no modo offline:** faça um *Download backup* em Saves; no modo online, pegue a
+  frase em Jogos salvos na nuvem; no offline, cole a frase lá. Se os saves dos dois lados forem diferentes, a página
+  mostra os dois (perfis, dinheiro, data) e pergunta qual fica.
   Versões: o pacote é de um commit fixo do nfsu2-web e o nfsu2.xyz atualiza quando o autor publica. Hoje são o
   o mesmo (`b735d26`, de 03/11/2026); se o nfsu2.xyz andar e o multiplayer parar de funcionar com ele, remonte o pacote com
   `--rev main`, ou use o seu servidor, que fica na versão do pacote.
@@ -180,7 +193,14 @@ oferece compartilhar.
   recusas (503 sem servidor, 502 fora do ar, o 429 do remoto repassado, 403 de outra origem) e o `/players`
   repassado (com corpo `chunked`, `Content-Length` e HEAD). Conferidos por mutação (tirar o quadro grudado ou a
   escrita do TLS faz os testes falharem). A API C, também por um programa em C linkado na `.a`.
-- **Servidor (Rust)**: 23 testes passando no total (`cargo test`, com os da ponte): rotas, cabeçalhos de isolamento, Range, blocos, pedidos
+- **Nuvem, nomes e amigos** (0.5.0): `tests/ponte.rs`, contra um servidor falso em HTTP e em HTTPS, numa conexão só
+  (keep-alive): `GET /vault` sem token dá o 401 do remoto (é assim que a página descobre a nuvem), saves de 200 KB
+  com `ETag` e `x-vault-saved`, 304, `PUT` de 250 KB em pedaços com `If-Match` (e o 412 de outro aparelho), `/names`
+  GET e POST (resposta chunked), HEAD, o 429 com `Retry-After`, DELETE; o que chega ao remoto (sem `Origin`,
+  `Sec-Fetch-Site` nem cookie, corpo inteiro). Falhas: 404 sem servidor, 502 sem internet, 405 com `Allow`, 413,
+  411 (chunked), 403 de outra origem ou outro site, 421; nenhum desses chega ao remoto. Conferidos por mutação
+  (mandar `Origin` ou deixar o corpo vazar para o pedido seguinte faz os testes falharem).
+- **Servidor (Rust)**: 26 testes passando no total (`cargo test`, 18 de integração e 8 de unidade; 23 antes da 0.5.0): rotas, cabeçalhos de isolamento, Range, blocos, pedidos
   recusados (outro Host, caminho com `..`/`%2f`, links simbólicos, arquivos fora das entradas do jogo), keep-alive e
   pedidos em sequência no mesmo pacote, 16 conexões simultâneas, religar na mesma porta (inclusive quando o
   sistema derruba o socket de escuta, como o iOS faz com app suspenso: o app confere a cada 10 s e ao voltar para a
@@ -201,6 +221,9 @@ oferece compartilhar.
 
 ## Histórico
 
+- **0.5.0**: o modo offline usa a frase secreta: a ponte repassa ao servidor escolhido os jogos salvos na nuvem, os
+  nomes reservados e os amigos. O nome reservado vale no free roam (antes o hub isolava quem jogava no offline com um
+  nome reservado), e os saves sincronizam com o modo online pela nuvem; sem internet o jogo segue com os do iPhone.
 - **0.4.0**: nfsu2-web atualizado para `b735d26` (03/11/2026: tela dividida, mapa detalhado, modo foto, drift entre
   jogadores, correções de travamento no free roam e nas garagens…); **Baixar do meu servidor** reaproveita os arquivos
   que já estão no iPhone (numa atualização do pacote, só ele desce).

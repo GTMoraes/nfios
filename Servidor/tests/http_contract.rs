@@ -207,7 +207,7 @@ fn the_page_and_its_files() {
     assert!(id.bytes().all(|c| c.is_ascii_hexdigit()), "{id}");
     assert_eq!(get(port, &format!("/game.wasm?v={id}"), &[]).body, f.wasm);
     assert_eq!(get(port, "/game.json?latest", &[]).status, 200);
-    // o que o modo local não tem: 404 (sem service worker, sem cofre de saves, sem nomes)
+    // o que o modo local não tem: 404 (sem service worker; a nuvem e os nomes, sem servidor escolhido: ponte.rs)
     for p in ["/sw.js", "/vault", "/names"] {
         assert_eq!(get(port, p, &[]).status, 404, "{p}");
     }
