@@ -21,7 +21,7 @@
 set -euo pipefail
 
 # a versão do nfsu2-web que o app conhece (testada com o servidor local do app); --rev main pega a mais nova
-REV_PADRAO="b735d26a57f6d6848a0b5041e1f28176d273b244"
+REV_PADRAO="9e0230212776f6c9a4d0db30c1963e9730138553"
 WASI_VERSAO=34
 NODE_VERSAO=22.20.0
 EXE_TAMANHO=4800512

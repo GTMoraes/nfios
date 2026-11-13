@@ -40,7 +40,7 @@ services:
 
   server:
     # a versão é a do pacote do app (pacote/montar-pacote.sh, REV_PADRAO): página, módulo e servidor do mesmo commit
-    image: ${NFSU2_IMAGEM:-ghcr.io/th0mk/nfsu2-web-rs:sha-b735d26}
+    image: ${NFSU2_IMAGEM:-ghcr.io/th0mk/nfsu2-web-rs:sha-9e02302}
     restart: unless-stopped
     network_mode: service:net
     depends_on: [net]

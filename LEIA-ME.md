@@ -161,7 +161,8 @@ Valem na próxima vez que o jogo abrir.
   frase em Jogos salvos na nuvem; no offline, cole a frase lá. Se os saves dos dois lados forem diferentes, a página
   mostra os dois (perfis, dinheiro, data) e pergunta qual fica.
   Versões: o pacote é de um commit fixo do nfsu2-web e o nfsu2.xyz atualiza quando o autor publica. Hoje são o
-  o mesmo (`b735d26`, de 03/11/2026); se o nfsu2.xyz andar e o multiplayer parar de funcionar com ele, remonte o pacote com
+  o pacote é da `9e02302` (09/11/2026), a última versão pública: o repositório do nfsu2-web foi arquivado nesse dia e o
+  nfsu2.xyz segue com código fechado; se o nfsu2.xyz andar e o multiplayer parar de funcionar com ele, remonte o pacote com
   `--rev main`, ou use o seu servidor, que fica na versão do pacote.
 
 ## Downloads da página
@@ -221,6 +222,10 @@ oferece compartilhar.
 
 ## Histórico
 
+- **0.6.0**: nfsu2-web `9e02302` (09/11/2026, a última versão pública: dano visual, placas com texto próprio, mods
+  Stance e HQ Vinyls, menos travadas no iPhone em free roam cheio…); o servidor local lê as pinturas em alta
+  (`?o=&l=` nos blocos) e as pastas novas `hqvinyls`, `modpacks` e `vinylpacks`; a ponte repassa também `/country` e
+  `/lastfm`.
 - **0.5.0**: o modo offline usa a frase secreta: a ponte repassa ao servidor escolhido os jogos salvos na nuvem, os
   nomes reservados e os amigos. O nome reservado vale no free roam (antes o hub isolava quem jogava no offline com um
   nome reservado), e os saves sincronizam com o modo online pela nuvem; sem internet o jogo segue com os do iPhone.

@@ -369,6 +369,14 @@ fn data_blocks() {
     // o endereço sem v2/ (de antes) também
     assert_eq!(get(port, "/data-blocks/TRACKS/STREAML4RA.BUN?b=2&n=1", &[]).body, &f.big[2 * MB..3 * MB]);
     assert_eq!(get(port, "/data-blocks/v2/SAVE/profile?b=0&n=1", &[]).status, 404);
+    // ?o=&l=: os bytes exatos (as pinturas em alta da página)
+    let r = get(port, &u("o=1000&l=30000&m=1&s=3670016"), &[]);
+    assert_eq!((r.status, r.body.as_slice()), (200, &f.big[1000..31000]));
+    assert_eq!(get(port, &u(&format!("o={}&l=100", f.big.len() - 10)), &[]).body, &f.big[f.big.len() - 10..]);
+    assert_eq!(get(port, &u(&format!("o={}&l=1", f.big.len())), &[]).status, 416);
+    for q in ["o=0&l=0", "o=0", "o=x&l=1", &format!("o=0&l={}", 8 * MB + 1), "o=1234567890123&l=1"] {
+        assert_eq!(get(port, &u(q), &[]).status, 400, "{q}");
+    }
     nfsu2srv::stop();
 }
 

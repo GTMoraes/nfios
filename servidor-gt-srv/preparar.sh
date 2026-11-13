@@ -15,7 +15,7 @@
 set -euo pipefail
 
 EXE_SHA=f9dd86c054878ce6276beb07c1fd61874f7a1e4bf1f241b084c65b73e24168a7
-REV_IMAGEM=b735d26
+REV_IMAGEM=9e02302
 
 erro() { echo "ERRO: $*" >&2; exit 1; }
 AQUI="$(cd "$(dirname "$0")" && pwd)"
@@ -83,7 +83,8 @@ import hashlib, json, os, shutil, sys, time
 jogo, pacote, novo = sys.argv[1:4]
 # as entradas do jogo que o servidor oficial serve (web/server-rs, GAME_ENTRIES) e as do pacote
 ENTRADAS_JOGO = {"speed2.exe", "server.dll", "server.cfg", "cars", "credits", "frontend", "global", "langpacks",
-                 "languages", "memcard", "movies", "nis", "pfdata", "sound", "speech", "subtitles", "texpacks", "tracks"}
+                 "languages", "memcard", "movies", "nis", "pfdata", "sound", "speech", "subtitles", "texpacks", "tracks",
+                 "hqvinyls", "modpacks", "vinylpacks"}
 ENTRADAS_PACOTE = {"web", "game.wasm", "game.json", "pacote.json"}
 itens = []
 def copiar(origem, raiz_dest, prefixo, permitidas):

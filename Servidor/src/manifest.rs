@@ -14,7 +14,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 /// as entradas do primeiro nível que são do jogo (as mesmas do oficial)
-pub const GAME_ENTRIES: [&str; 18] = [
+pub const GAME_ENTRIES: [&str; 21] = [
     "speed2.exe",
     "server.dll",
     "server.cfg",
@@ -22,9 +22,11 @@ pub const GAME_ENTRIES: [&str; 18] = [
     "credits",
     "frontend",
     "global",
+    "hqvinyls", // as pinturas em alta dos carros (tools/hqvinyls.py do nfsu2-web), se a pasta tiver
     "langpacks",
     "languages",
     "memcard",
+    "modpacks", // o que os mods da comunidade acrescentam (tools/modpacks.py), se a pasta tiver
     "movies",
     "nis",
     "pfdata",
@@ -33,6 +35,7 @@ pub const GAME_ENTRIES: [&str; 18] = [
     "subtitles",
     "texpacks",
     "tracks",
+    "vinylpacks", // as pinturas da versão japonesa (tools/vinylpacks.py), se a pasta tiver
 ];
 
 pub const BLOCK: u64 = 1 << 20;

@@ -417,10 +417,38 @@ fn send_range(c: &mut Conn, f: &File, start: u64, end: u64) -> io::Result<()> {
     Ok(())
 }
 
-/// /data-blocks/<caminho>?b=<primeiro>&n=<quantos>: os blocos b .. b+n-1 (1 MiB cada, o último menor) num 200
+/// /data-blocks/<caminho>?b=<primeiro>&n=<quantos>: os blocos b .. b+n-1 (1 MiB cada, o último menor) num 200.
+/// Com ?o=&l= no lugar de b e n: os bytes o .. o+l-1 do arquivo como estão, num 200 com exatamente eles (as pinturas em
+/// alta da página, gpu/hqskin.ts, leem assim ~30 KB de cada vez; web/server-rs/src/app/blocks.rs send_exact).
 fn blocks(cfg: &Config, q: &Request, c: &mut Conn, rest: &str, keep: bool) -> io::Result<bool> {
     let Some(path) = game_file(cfg, rest) else { return plain(c, q, 404, "Not found", keep) };
     let digits = |x: &Option<String>, max: usize| x.as_ref().is_some_and(|x| !x.is_empty() && x.len() <= max && x.bytes().all(|c| c.is_ascii_digit()));
+    if q.has_param("o") {
+        let (o, l) = (q.param("o"), q.param("l"));
+        if !digits(&o, 12) || !digits(&l, 8) {
+            return plain(c, q, 400, "Bad request", keep);
+        }
+        let o: u64 = o.unwrap().parse().unwrap_or(0);
+        let l: u64 = l.unwrap().parse().unwrap_or(0);
+        if !(1..=BLOCK * BLOCKS_MAX).contains(&l) {
+            return plain(c, q, 400, "Bad request", keep);
+        }
+        let f = match File::open(&path) {
+            Ok(f) => f,
+            Err(_) => return plain(c, q, 404, "Not found", keep),
+        };
+        let size = f.metadata()?.len();
+        if o >= size {
+            return plain(c, q, 416, "Range not satisfiable", keep);
+        }
+        let end = size.min(o + l);
+        let h = [("Content-Type", "application/octet-stream".to_string())];
+        c.write_head(200, &h, Some(end - o), keep)?;
+        if q.method != "HEAD" {
+            send_range(c, &f, o, end)?;
+        }
+        return Ok(keep);
+    }
     let (b, n) = (q.param("b"), q.param("n"));
     if !digits(&b, 7) || !digits(&n, 2) {
         return plain(c, q, 400, "Bad request", keep);

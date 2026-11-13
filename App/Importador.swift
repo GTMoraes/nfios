@@ -30,6 +30,7 @@ final class Importador: @unchecked Sendable {   // o que a tela lê muda só na 
     static let entradasDoJogo: Set<String> = [
         "speed2.exe", "server.dll", "server.cfg", "cars", "credits", "frontend", "global", "langpacks", "languages",
         "memcard", "movies", "nis", "pfdata", "sound", "speech", "subtitles", "texpacks", "tracks",
+        "hqvinyls", "modpacks", "vinylpacks",
     ]
     /// do pacote: a página e o módulo
     static let entradasDoPacote: Set<String> = ["web", "game.wasm", "game.json", "pacote.json"]

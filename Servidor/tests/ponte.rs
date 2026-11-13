@@ -572,7 +572,7 @@ fn falhas_do_repasse() {
     };
     // nenhum servidor escolhido: 404, o "servidor sem nuvem e sem nomes" de antes
     nfsu2srv::ponte::definir(None).unwrap();
-    for p in ["/vault", "/names?name=x", "/friends", "/seen?at=play"] {
+    for p in ["/vault", "/names?name=x", "/friends", "/seen?at=play", "/country", "/lastfm"] {
         assert_eq!(status(&um("GET", p, "", &[])), 404, "{p}");
     }
     assert_eq!(status(&um("PUT", "/vault", "", b"abc")), 404);
@@ -589,6 +589,11 @@ fn falhas_do_repasse() {
     assert_eq!((status(&r), cab(&r, "allow")), (405, Some("GET, HEAD, PUT, DELETE")), "{r}");
     let r = um("POST", "/seen", "", b"x");
     assert_eq!((status(&r), cab(&r, "allow")), (405, Some("GET, HEAD")), "{r}");
+    // as rotas da 9e02302: /country só GET e HEAD, /lastfm também POST (até 4 KB)
+    let r = um("POST", "/country", "", b"x");
+    assert_eq!((status(&r), cab(&r, "allow")), (405, Some("GET, HEAD")), "{r}");
+    let r = um("PUT", "/lastfm", "", b"x");
+    assert_eq!((status(&r), cab(&r, "allow")), (405, Some("GET, HEAD, POST")), "{r}");
     assert_eq!(status(&um("GET", "/names", "", b"corpo")), 413);
     // (grande demais: só o cabeçalho, com o tamanho; a recusa vem antes do corpo e fecha a conexão, e um corpo que
     // ainda estivesse indo levaria um RST que pode apagar a resposta)

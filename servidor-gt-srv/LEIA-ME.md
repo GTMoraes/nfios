@@ -9,7 +9,7 @@ Duas coisas:
   pacote daqui, pelo Tailscale, conferindo o SHA-256 de cada arquivo. Para reinstalar ou trocar de iPhone sem
   copiar pasta à mão. Nada disso fica público: só a sua tailnet e a LAN chegam à porta.
 
-- Imagem: `ghcr.io/th0mk/nfsu2-web-rs:sha-b735d26`, a mesma versão do pacote do app (página, módulo e servidor
+- Imagem: `ghcr.io/th0mk/nfsu2-web-rs:sha-9e02302`, a mesma versão do pacote do app (página, módulo e servidor
   do mesmo commit).
 - Acesso: `http://100.91.24.1:9091` pelo Tailscale (e `http://10.0.0.129:9091` na LAN). Sem Cloudflare Tunnel e
   sem hostname público; o roteador não encaminha a porta.

@@ -371,12 +371,17 @@ pub fn players(q: &Request, c: &mut Conn, keep: bool) -> io::Result<bool> {
 ///   /names    os nomes reservados: GET (o que um nome é para a frase secreta), POST (reservar)
 ///   /friends  os amigos do free roam: GET (lista e recados), POST (aceitar, recusar, mensagem...)
 ///   /seen     a página conta que jogou hoje (e as configurações): GET
+///   /country  o país de quem joga, para a página sugerir a língua (nfsu2-web 9e02302): GET
+///   /lastfm   o Last.fm assina e repassa as músicas que tocam (9e02302): GET (a chave), POST (sessão, scrobble; até
+///             4 KB lá)
 pub fn rota(path: &str) -> Option<(&'static [&'static str], usize)> {
     match path {
         "/vault" => Some((&["GET", "HEAD", "PUT", "DELETE"], 512 << 10)),
         "/names" => Some((&["GET", "HEAD", "POST"], 16 << 10)),
         "/friends" => Some((&["GET", "HEAD", "POST"], 16 << 10)),
         "/seen" => Some((&["GET", "HEAD"], 0)),
+        "/country" => Some((&["GET", "HEAD"], 0)),
+        "/lastfm" => Some((&["GET", "HEAD", "POST"], 4 << 10)),
         _ => None,
     }
 }
